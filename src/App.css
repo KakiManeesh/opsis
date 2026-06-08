@@ -1,0 +1,184 @@
+.app-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 28px;
+}
+
+.status-badge {
+  padding: 8px 12px;
+  border: 1px solid #222;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.status-loading {
+  background: #fff3cd;
+}
+
+.status-ready {
+  background: #d4edda;
+}
+
+.status-error {
+  background: #f8d7da;
+}
+
+.error-text {
+  margin: 0 0 16px;
+  color: #8a1c1c;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.sidebar,
+.canvas-column,
+.code-panel,
+.canvas-panel,
+.panel-block {
+  border: 1px solid #222;
+  background: #fff;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.panel-block {
+  padding: 12px;
+}
+
+.panel-label,
+.panel-heading {
+  display: block;
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.canvas-column {
+  padding: 16px;
+}
+
+.canvas-panel {
+  padding: 12px;
+}
+
+.image-canvas {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 240px;
+  background: #efefef;
+}
+
+.action-button,
+input[type='file'],
+.operation-select,
+.param-input {
+  width: 100%;
+}
+
+.operation-select,
+.param-input {
+  min-height: 40px;
+  border: 1px solid #222;
+  background: #fff;
+}
+
+.operation-select {
+  margin-bottom: 12px;
+}
+
+.param-group {
+  display: grid;
+  gap: 8px;
+}
+
+.param-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.param-input {
+  display: block;
+  margin-top: 4px;
+}
+
+.control-button,
+.button-row {
+  margin-top: 12px;
+}
+
+.button-row {
+  display: grid;
+  gap: 8px;
+}
+
+.action-button {
+  min-height: 40px;
+  border: 1px solid #222;
+  background: #ddd;
+  cursor: pointer;
+}
+
+.action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pipeline-heading {
+  margin-top: 16px;
+}
+
+.pipeline-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.empty-pipeline {
+  margin: 0;
+  font-size: 14px;
+}
+
+.code-panel {
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.code-output {
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  background: #f4f4f4;
+  border: 1px solid #222;
+}
+
+@media (max-width: 900px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+}
