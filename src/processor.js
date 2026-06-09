@@ -277,12 +277,24 @@ function applyPipelineStep(cv, sourceMat, step) {
       return convertToGrayscale(cv, sourceMat);
     case 'gaussianBlur':
       return applyGaussianBlur(cv, sourceMat, step.params);
+    case 'medianBlur':
+      return applyMedianBlur(cv, sourceMat, step.params);
     case 'threshold':
       return applyThreshold(cv, sourceMat, step.params, cv.THRESH_BINARY);
     case 'binaryInverseThreshold':
       return applyThreshold(cv, sourceMat, step.params, cv.THRESH_BINARY_INV);
     case 'canny':
       return applyCanny(cv, sourceMat, step.params);
+    case 'erosion':
+      return applyErosion(cv, sourceMat, step.params);
+    case 'dilation':
+      return applyDilation(cv, sourceMat, step.params);
+    case 'opening':
+      return applyOpening(cv, sourceMat, step.params);
+    case 'closing':
+      return applyClosing(cv, sourceMat, step.params);
+    case 'histogramEqualisation':
+      return applyHistogramEqualisation(cv, sourceMat);
     case 'sharpen':
       return applySharpen(cv, sourceMat);
     default:
@@ -291,12 +303,25 @@ function applyPipelineStep(cv, sourceMat, step) {
 }
 
 function applyGaussianBlur(cv, sourceMat, params = {}) {
-  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 5);
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 5, 'Gaussian Blur');
   const blurredMat = new cv.Mat();
   const size = new cv.Size(kernelSize, kernelSize);
 
   cv.GaussianBlur(sourceMat, blurredMat, size, 0, 0, cv.BORDER_DEFAULT);
   return blurredMat;
+}
+
+function applyMedianBlur(cv, sourceMat, params = {}) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Median Blur');
+  const blurredMat = new cv.Mat();
+
+  try {
+    cv.medianBlur(sourceMat, blurredMat, kernelSize);
+    return blurredMat;
+  } catch (error) {
+    blurredMat.delete();
+    throw error;
+  }
 }
 
 function applyThreshold(cv, sourceMat, params = {}, thresholdType) {
@@ -326,6 +351,101 @@ function applyCanny(cv, sourceMat, params = {}) {
   }
 }
 
+function applyErosion(cv, sourceMat, params = {}) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Erosion');
+  const iterations = normalizeIterations(params.iterations ?? 1, 'Erosion');
+  const erodedMat = new cv.Mat();
+  const kernel = cv.getStructuringElement(
+    cv.MORPH_RECT,
+    new cv.Size(kernelSize, kernelSize)
+  );
+
+  try {
+    cv.erode(sourceMat, erodedMat, kernel, new cv.Point(-1, -1), iterations);
+    return erodedMat;
+  } catch (error) {
+    erodedMat.delete();
+    throw error;
+  } finally {
+    kernel.delete();
+  }
+}
+
+function applyDilation(cv, sourceMat, params = {}) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Dilation');
+  const iterations = normalizeIterations(params.iterations ?? 1, 'Dilation');
+  const dilatedMat = new cv.Mat();
+  const kernel = cv.getStructuringElement(
+    cv.MORPH_RECT,
+    new cv.Size(kernelSize, kernelSize)
+  );
+
+  try {
+    cv.dilate(sourceMat, dilatedMat, kernel, new cv.Point(-1, -1), iterations);
+    return dilatedMat;
+  } catch (error) {
+    dilatedMat.delete();
+    throw error;
+  } finally {
+    kernel.delete();
+  }
+}
+
+function applyOpening(cv, sourceMat, params = {}) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Opening');
+  const iterations = normalizeIterations(params.iterations ?? 1, 'Opening');
+  const openedMat = new cv.Mat();
+  const kernel = cv.getStructuringElement(
+    cv.MORPH_RECT,
+    new cv.Size(kernelSize, kernelSize)
+  );
+
+  try {
+    cv.morphologyEx(sourceMat, openedMat, cv.MORPH_OPEN, kernel, new cv.Point(-1, -1), iterations);
+    return openedMat;
+  } catch (error) {
+    openedMat.delete();
+    throw error;
+  } finally {
+    kernel.delete();
+  }
+}
+
+function applyClosing(cv, sourceMat, params = {}) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Closing');
+  const iterations = normalizeIterations(params.iterations ?? 1, 'Closing');
+  const closedMat = new cv.Mat();
+  const kernel = cv.getStructuringElement(
+    cv.MORPH_RECT,
+    new cv.Size(kernelSize, kernelSize)
+  );
+
+  try {
+    cv.morphologyEx(sourceMat, closedMat, cv.MORPH_CLOSE, kernel, new cv.Point(-1, -1), iterations);
+    return closedMat;
+  } catch (error) {
+    closedMat.delete();
+    throw error;
+  } finally {
+    kernel.delete();
+  }
+}
+
+function applyHistogramEqualisation(cv, sourceMat) {
+  const grayMat = convertToGrayscale(cv, sourceMat);
+  const equalizedMat = new cv.Mat();
+
+  try {
+    cv.equalizeHist(grayMat, equalizedMat);
+    return equalizedMat;
+  } catch (error) {
+    equalizedMat.delete();
+    throw error;
+  } finally {
+    grayMat.delete();
+  }
+}
+
 function applySharpen(cv, sourceMat) {
   const sharpenedMat = new cv.Mat();
   const kernel = cv.matFromArray(3, 3, cv.CV_32F, [0, -1, 0, -1, 5, -1, 0, -1, 0]);
@@ -350,20 +470,30 @@ function convertToGrayscale(cv, sourceMat) {
   return grayMat;
 }
 
-function normalizeOddKernelSize(value) {
+function normalizeOddKernelSize(value, operationLabel) {
   const kernelSize = Number(value);
 
   if (!Number.isFinite(kernelSize) || kernelSize < 1) {
-    throw new Error('Gaussian Blur kernel size must be a positive odd number.');
+    throw new Error(`${operationLabel} kernel size must be a positive odd number.`);
   }
 
   const roundedKernelSize = Math.round(kernelSize);
 
   if (roundedKernelSize % 2 === 0) {
-    throw new Error('Gaussian Blur kernel size must be odd.');
+    throw new Error(`${operationLabel} kernel size must be odd.`);
   }
 
   return roundedKernelSize;
+}
+
+function normalizeIterations(value, operationLabel) {
+  const iterations = Number(value);
+
+  if (!Number.isFinite(iterations) || iterations < 1) {
+    throw new Error(`${operationLabel} iterations must be a positive number.`);
+  }
+
+  return Math.round(iterations);
 }
 
 function clampByte(value) {

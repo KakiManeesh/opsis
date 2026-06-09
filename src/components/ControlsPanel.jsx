@@ -3,17 +3,28 @@ import { useState } from 'react';
 const OPERATION_OPTIONS = [
   { type: 'grayscale', label: 'Grayscale' },
   { type: 'gaussianBlur', label: 'Gaussian Blur' },
+  { type: 'medianBlur', label: 'Median Blur' },
   { type: 'threshold', label: 'Threshold' },
   { type: 'binaryInverseThreshold', label: 'Binary Inverse Threshold' },
   { type: 'canny', label: 'Canny Edge Detection' },
+  { type: 'erosion', label: 'Erosion' },
+  { type: 'dilation', label: 'Dilation' },
+  { type: 'opening', label: 'Opening' },
+  { type: 'closing', label: 'Closing' },
+  { type: 'histogramEqualisation', label: 'Histogram Equalisation' },
   { type: 'sharpen', label: 'Sharpen preset' }
 ];
 
 const DEFAULT_PARAMS = {
   gaussianBlur: { kernelSize: 5 },
+  medianBlur: { kernelSize: 3 },
   threshold: { thresholdValue: 127 },
   binaryInverseThreshold: { thresholdValue: 127 },
-  canny: { threshold1: 100, threshold2: 200 }
+  canny: { threshold1: 100, threshold2: 200 },
+  erosion: { kernelSize: 3, iterations: 1 },
+  dilation: { kernelSize: 3, iterations: 1 },
+  opening: { kernelSize: 3, iterations: 1 },
+  closing: { kernelSize: 3, iterations: 1 }
 };
 
 /**
@@ -141,6 +152,29 @@ function OperationParams({
     );
   }
 
+  if (selectedOperation === 'medianBlur') {
+    return (
+      <label className="param-label" htmlFor="median-kernel-size">
+        Kernel Size
+        <select
+          id="median-kernel-size"
+          className="param-input"
+          value={operationParams.medianBlur.kernelSize}
+          onChange={(event) =>
+            onParamChange('medianBlur', 'kernelSize', event.target.value)
+          }
+          disabled={!canEditPipeline}
+        >
+          {[3, 5, 7].map((kernelSize) => (
+            <option key={kernelSize} value={kernelSize}>
+              {kernelSize}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
   if (
     selectedOperation === 'threshold' ||
     selectedOperation === 'binaryInverseThreshold'
@@ -203,6 +237,63 @@ function OperationParams({
     );
   }
 
+  if (
+    selectedOperation === 'erosion' ||
+    selectedOperation === 'dilation' ||
+    selectedOperation === 'opening' ||
+    selectedOperation === 'closing'
+  ) {
+    const operationLabel =
+      selectedOperation === 'erosion'
+        ? 'Erosion'
+        : selectedOperation === 'dilation'
+          ? 'Dilation'
+          : selectedOperation === 'opening'
+            ? 'Opening'
+            : 'Closing';
+
+    return (
+      <div className="param-group">
+        <label className="param-label" htmlFor={`${selectedOperation}-kernel-size`}>
+          Kernel Size
+          <select
+            id={`${selectedOperation}-kernel-size`}
+            className="param-input"
+            value={operationParams[selectedOperation].kernelSize}
+            onChange={(event) =>
+              onParamChange(selectedOperation, 'kernelSize', event.target.value)
+            }
+            disabled={!canEditPipeline}
+          >
+            {[3, 5, 7].map((kernelSize) => (
+              <option key={kernelSize} value={kernelSize}>
+                {kernelSize}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="param-label" htmlFor={`${selectedOperation}-iterations`}>
+          {operationLabel} Iterations
+          <select
+            id={`${selectedOperation}-iterations`}
+            className="param-input"
+            value={operationParams[selectedOperation].iterations}
+            onChange={(event) =>
+              onParamChange(selectedOperation, 'iterations', event.target.value)
+            }
+            disabled={!canEditPipeline}
+          >
+            {[1, 2, 3].map((iterations) => (
+              <option key={iterations} value={iterations}>
+                {iterations}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    );
+  }
+
   return null;
 }
 
@@ -219,12 +310,29 @@ function formatParams(operationType, params = {}) {
     return `kernel ${params.kernelSize}`;
   }
 
+  if (operationType === 'medianBlur') {
+    return `kernel ${params.kernelSize}`;
+  }
+
   if (operationType === 'threshold' || operationType === 'binaryInverseThreshold') {
     return `threshold ${params.thresholdValue}`;
   }
 
   if (operationType === 'canny') {
     return `${params.threshold1}, ${params.threshold2}`;
+  }
+
+  if (
+    operationType === 'erosion' ||
+    operationType === 'dilation' ||
+    operationType === 'opening' ||
+    operationType === 'closing'
+  ) {
+    return `kernel ${params.kernelSize}, iterations ${params.iterations}`;
+  }
+
+  if (operationType === 'histogramEqualisation') {
+    return '';
   }
 
   return '';

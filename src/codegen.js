@@ -10,7 +10,7 @@ export function generatePythonCode(pipeline = []) {
   const lines = ['img = cv2.imread("image.jpg")'];
   let isGray = false;
 
-  if (pipeline.some((step) => step.type === 'sharpen')) {
+  if (pipeline.some((step) => requiresNumPy(step.type))) {
     imports.push('import numpy as np');
   }
 
@@ -36,12 +36,24 @@ function generateStepCode(step, isGray) {
       return generateGrayscaleCode(isGray);
     case 'gaussianBlur':
       return generateGaussianBlurCode(step.params, isGray);
+    case 'medianBlur':
+      return generateMedianBlurCode(step.params, isGray);
     case 'threshold':
       return generateThresholdCode(step.params, isGray, 'cv2.THRESH_BINARY');
     case 'binaryInverseThreshold':
       return generateThresholdCode(step.params, isGray, 'cv2.THRESH_BINARY_INV');
     case 'canny':
       return generateCannyCode(step.params, isGray);
+    case 'erosion':
+      return generateErosionCode(step.params, isGray);
+    case 'dilation':
+      return generateDilationCode(step.params, isGray);
+    case 'opening':
+      return generateOpeningCode(step.params, isGray);
+    case 'closing':
+      return generateClosingCode(step.params, isGray);
+    case 'histogramEqualisation':
+      return generateHistogramEqualisationCode(isGray);
     case 'sharpen':
       return generateSharpenCode(isGray);
     default:
@@ -69,6 +81,15 @@ function generateGaussianBlurCode(params = {}, isGray) {
   };
 }
 
+function generateMedianBlurCode(params = {}, isGray) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3);
+
+  return {
+    lines: [`img = cv2.medianBlur(img, ${kernelSize})`],
+    isGray
+  };
+}
+
 function generateThresholdCode(params = {}, isGray, thresholdType) {
   const lines = ensureGrayCode(isGray);
   const thresholdValue = clampByte(params.thresholdValue ?? 127);
@@ -88,6 +109,66 @@ function generateCannyCode(params = {}, isGray) {
   return { lines, isGray: true };
 }
 
+function generateErosionCode(params = {}, isGray) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3);
+  const iterations = normalizeIterations(params.iterations ?? 1);
+
+  return {
+    lines: [
+      `kernel = np.ones((${kernelSize}, ${kernelSize}), np.uint8)`,
+      `img = cv2.erode(img, kernel, iterations=${iterations})`
+    ],
+    isGray
+  };
+}
+
+function generateDilationCode(params = {}, isGray) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3);
+  const iterations = normalizeIterations(params.iterations ?? 1);
+
+  return {
+    lines: [
+      `kernel = np.ones((${kernelSize}, ${kernelSize}), np.uint8)`,
+      `img = cv2.dilate(img, kernel, iterations=${iterations})`
+    ],
+    isGray
+  };
+}
+
+function generateOpeningCode(params = {}, isGray) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3);
+  const iterations = normalizeIterations(params.iterations ?? 1);
+
+  return {
+    lines: [
+      `kernel = np.ones((${kernelSize}, ${kernelSize}), np.uint8)`,
+      `img = cv2.morphologyEx(img, cv2.MORPH_OPEN, kernel, iterations=${iterations})`
+    ],
+    isGray
+  };
+}
+
+function generateClosingCode(params = {}, isGray) {
+  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3);
+  const iterations = normalizeIterations(params.iterations ?? 1);
+
+  return {
+    lines: [
+      `kernel = np.ones((${kernelSize}, ${kernelSize}), np.uint8)`,
+      `img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel, iterations=${iterations})`
+    ],
+    isGray
+  };
+}
+
+function generateHistogramEqualisationCode(isGray) {
+  const lines = isGray ? [] : ensureGrayCode(false);
+
+  lines.push('img = cv2.equalizeHist(img)');
+
+  return { lines, isGray: true };
+}
+
 function generateSharpenCode(isGray) {
   return {
     lines: [
@@ -100,6 +181,16 @@ function generateSharpenCode(isGray) {
 
 function ensureGrayCode(isGray) {
   return isGray ? [] : ['img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)'];
+}
+
+function requiresNumPy(operationType) {
+  return (
+    operationType === 'sharpen' ||
+    operationType === 'erosion' ||
+    operationType === 'dilation' ||
+    operationType === 'opening' ||
+    operationType === 'closing'
+  );
 }
 
 function normalizeOddKernelSize(value) {
@@ -121,4 +212,14 @@ function clampByte(value) {
   }
 
   return Math.min(255, Math.max(0, Math.round(numberValue)));
+}
+
+function normalizeIterations(value) {
+  const iterations = Number(value);
+
+  if (!Number.isFinite(iterations) || iterations < 1) {
+    return 1;
+  }
+
+  return Math.round(iterations);
 }
