@@ -11,6 +11,11 @@ import {
   prepareCanvasPair
 } from './processor.js';
 import { generatePythonCode } from './codegen.js';
+import {
+  normalizeOperationParams,
+  parseImportedPipelinePayload,
+  serializePipelineForExport
+} from './operationConfig.js';
 import './App.css';
 
 const OPEN_CV_STATUS = {
@@ -34,6 +39,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('');
   const [pipeline, setPipeline] = useState([]);
   const [selectedOperation, setSelectedOperation] = useState(DEFAULT_OPERATION);
+
+  const createPipelineStepId = () => `step-${nextPipelineStepIdRef.current++}`;
 
   useEffect(() => {
     loadOpenCv()
@@ -105,11 +112,101 @@ function App() {
     setPipeline((currentPipeline) => [
       ...currentPipeline,
       {
-        id: `step-${nextPipelineStepIdRef.current++}`,
+        id: createPipelineStepId(),
         type: selectedOperation,
-        params
+        params: normalizeOperationParams(selectedOperation, params) ?? {}
       }
     ]);
+  };
+
+  const handleUpdateStepParams = (stepId, params) => {
+    setPipeline((currentPipeline) =>
+      currentPipeline.map((step) =>
+        step.id === stepId
+          ? {
+              ...step,
+              params: normalizeOperationParams(step.type, params) ?? {}
+            }
+          : step
+      )
+    );
+  };
+
+  const handleMoveStep = (stepId, direction) => {
+    setPipeline((currentPipeline) => {
+      const currentIndex = currentPipeline.findIndex((step) => step.id === stepId);
+
+      if (currentIndex < 0) {
+        return currentPipeline;
+      }
+
+      const nextIndex = currentIndex + direction;
+      if (nextIndex < 0 || nextIndex >= currentPipeline.length) {
+        return currentPipeline;
+      }
+
+      const nextPipeline = [...currentPipeline];
+      [nextPipeline[currentIndex], nextPipeline[nextIndex]] = [
+        nextPipeline[nextIndex],
+        nextPipeline[currentIndex]
+      ];
+
+      return nextPipeline;
+    });
+  };
+
+  const handleDuplicateStep = (stepId) => {
+    setPipeline((currentPipeline) => {
+      const currentIndex = currentPipeline.findIndex((step) => step.id === stepId);
+
+      if (currentIndex < 0) {
+        return currentPipeline;
+      }
+
+      const sourceStep = currentPipeline[currentIndex];
+      const duplicateStep = {
+        id: createPipelineStepId(),
+        type: sourceStep.type,
+        params: normalizeOperationParams(sourceStep.type, sourceStep.params) ?? {}
+      };
+
+      const nextPipeline = [...currentPipeline];
+      nextPipeline.splice(currentIndex + 1, 0, duplicateStep);
+      return nextPipeline;
+    });
+  };
+
+  const handleDeleteStep = (stepId) => {
+    setPipeline((currentPipeline) => currentPipeline.filter((step) => step.id !== stepId));
+  };
+
+  const handleExportPipeline = () => {
+    const payload = serializePipelineForExport(pipeline);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = 'opsis-pipeline.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportPipeline = (jsonText) => {
+    try {
+      const payload = JSON.parse(jsonText);
+      const importedSteps = parseImportedPipelinePayload(payload);
+      const nextPipeline = importedSteps.map((step) => ({
+        id: createPipelineStepId(),
+        type: step.type,
+        params: step.params
+      }));
+
+      setErrorMessage('');
+      setPipeline(nextPipeline);
+    } catch (error) {
+      setErrorMessage(error.message);
+    }
   };
 
   const handleUndoLastStep = () => {
@@ -135,11 +232,17 @@ function App() {
         <aside className="sidebar">
           <ImageUploader onFileSelect={handleFileSelect} />
           <ControlsPanel
-            canEditPipeline={openCvStatus === 'ready' && hasImage}
+            canEditPipeline={openCvStatus === 'ready'}
             selectedOperation={selectedOperation}
             pipeline={pipeline}
             onSelectedOperationChange={setSelectedOperation}
             onAppendOperation={handleAppendOperation}
+            onUpdateStepParams={handleUpdateStepParams}
+            onMoveStep={handleMoveStep}
+            onDuplicateStep={handleDuplicateStep}
+            onDeleteStep={handleDeleteStep}
+            onExportPipeline={handleExportPipeline}
+            onImportPipeline={handleImportPipeline}
             onUndoLastStep={handleUndoLastStep}
             onResetPipeline={handleResetPipeline}
           />

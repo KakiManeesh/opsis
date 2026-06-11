@@ -1,3 +1,5 @@
+import { normalizeOperationParams } from './operationConfig.js';
+
 const OPEN_CV_SCRIPT_ID = 'opencv-js-cdn';
 const OPEN_CV_SCRIPT_SRC = 'https://docs.opencv.org/4.x/opencv.js';
 const OPEN_CV_LOAD_TIMEOUT_MS = 30000;
@@ -295,15 +297,22 @@ function applyPipelineStep(cv, sourceMat, step) {
       return applyClosing(cv, sourceMat, step.params);
     case 'histogramEqualisation':
       return applyHistogramEqualisation(cv, sourceMat);
+    case 'rotateImage':
+      return applyRotateImage(cv, sourceMat, step.params);
+    case 'brightnessContrast':
+      return applyBrightnessContrast(cv, sourceMat, step.params);
     case 'sharpen':
-      return applySharpen(cv, sourceMat);
+      return applySharpen(cv, sourceMat, step.params);
     default:
       throw new Error(`Unsupported pipeline operation: ${step.type}`);
   }
 }
 
 function applyGaussianBlur(cv, sourceMat, params = {}) {
-  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 5, 'Gaussian Blur');
+  const normalizedParams = normalizeOperationParams('gaussianBlur', params) ?? {
+    kernelSize: 5
+  };
+  const kernelSize = normalizedParams.kernelSize;
   const blurredMat = new cv.Mat();
   const size = new cv.Size(kernelSize, kernelSize);
 
@@ -312,7 +321,8 @@ function applyGaussianBlur(cv, sourceMat, params = {}) {
 }
 
 function applyMedianBlur(cv, sourceMat, params = {}) {
-  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Median Blur');
+  const normalizedParams = normalizeOperationParams('medianBlur', params) ?? { kernelSize: 3 };
+  const kernelSize = normalizedParams.kernelSize;
   const blurredMat = new cv.Mat();
 
   try {
@@ -325,12 +335,16 @@ function applyMedianBlur(cv, sourceMat, params = {}) {
 }
 
 function applyThreshold(cv, sourceMat, params = {}, thresholdType) {
+  const normalizedParams =
+    normalizeOperationParams(thresholdType === cv.THRESH_BINARY ? 'threshold' : 'binaryInverseThreshold',
+      params) ?? { thresholdValue: 127, maxValue: 255 };
   const grayMat = convertToGrayscale(cv, sourceMat);
   const thresholdMat = new cv.Mat();
-  const thresholdValue = clampByte(params.thresholdValue ?? 127);
+  const thresholdValue = normalizedParams.thresholdValue;
+  const maxValue = normalizedParams.maxValue;
 
   try {
-    cv.threshold(grayMat, thresholdMat, thresholdValue, 255, thresholdType);
+    cv.threshold(grayMat, thresholdMat, thresholdValue, maxValue, thresholdType);
     return thresholdMat;
   } finally {
     grayMat.delete();
@@ -338,13 +352,15 @@ function applyThreshold(cv, sourceMat, params = {}, thresholdType) {
 }
 
 function applyCanny(cv, sourceMat, params = {}) {
+  const normalizedParams = normalizeOperationParams('canny', params) ?? {
+    lowThreshold: 100,
+    highThreshold: 200
+  };
   const grayMat = convertToGrayscale(cv, sourceMat);
   const edgeMat = new cv.Mat();
-  const threshold1 = clampByte(params.threshold1 ?? 100);
-  const threshold2 = clampByte(params.threshold2 ?? 200);
 
   try {
-    cv.Canny(grayMat, edgeMat, threshold1, threshold2);
+    cv.Canny(grayMat, edgeMat, normalizedParams.lowThreshold, normalizedParams.highThreshold);
     return edgeMat;
   } finally {
     grayMat.delete();
@@ -352,8 +368,11 @@ function applyCanny(cv, sourceMat, params = {}) {
 }
 
 function applyErosion(cv, sourceMat, params = {}) {
-  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Erosion');
-  const iterations = normalizeIterations(params.iterations ?? 1, 'Erosion');
+  const normalizedParams = normalizeOperationParams('erosion', params) ?? {
+    kernelSize: 3,
+    iterations: 1
+  };
+  const { kernelSize, iterations } = normalizedParams;
   const erodedMat = new cv.Mat();
   const kernel = cv.getStructuringElement(
     cv.MORPH_RECT,
@@ -372,8 +391,11 @@ function applyErosion(cv, sourceMat, params = {}) {
 }
 
 function applyDilation(cv, sourceMat, params = {}) {
-  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Dilation');
-  const iterations = normalizeIterations(params.iterations ?? 1, 'Dilation');
+  const normalizedParams = normalizeOperationParams('dilation', params) ?? {
+    kernelSize: 3,
+    iterations: 1
+  };
+  const { kernelSize, iterations } = normalizedParams;
   const dilatedMat = new cv.Mat();
   const kernel = cv.getStructuringElement(
     cv.MORPH_RECT,
@@ -392,8 +414,11 @@ function applyDilation(cv, sourceMat, params = {}) {
 }
 
 function applyOpening(cv, sourceMat, params = {}) {
-  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Opening');
-  const iterations = normalizeIterations(params.iterations ?? 1, 'Opening');
+  const normalizedParams = normalizeOperationParams('opening', params) ?? {
+    kernelSize: 3,
+    iterations: 1
+  };
+  const { kernelSize, iterations } = normalizedParams;
   const openedMat = new cv.Mat();
   const kernel = cv.getStructuringElement(
     cv.MORPH_RECT,
@@ -412,8 +437,11 @@ function applyOpening(cv, sourceMat, params = {}) {
 }
 
 function applyClosing(cv, sourceMat, params = {}) {
-  const kernelSize = normalizeOddKernelSize(params.kernelSize ?? 3, 'Closing');
-  const iterations = normalizeIterations(params.iterations ?? 1, 'Closing');
+  const normalizedParams = normalizeOperationParams('closing', params) ?? {
+    kernelSize: 3,
+    iterations: 1
+  };
+  const { kernelSize, iterations } = normalizedParams;
   const closedMat = new cv.Mat();
   const kernel = cv.getStructuringElement(
     cv.MORPH_RECT,
@@ -446,9 +474,54 @@ function applyHistogramEqualisation(cv, sourceMat) {
   }
 }
 
-function applySharpen(cv, sourceMat) {
+function applyRotateImage(cv, sourceMat, params = {}) {
+  const normalizedParams = normalizeOperationParams('rotateImage', params) ?? {
+    rotationCode: 0
+  };
+  const rotatedMat = new cv.Mat();
+
+  try {
+    cv.rotate(sourceMat, rotatedMat, normalizedParams.rotationCode);
+    return rotatedMat;
+  } catch (error) {
+    rotatedMat.delete();
+    throw error;
+  }
+}
+
+function applyBrightnessContrast(cv, sourceMat, params = {}) {
+  const normalizedParams = normalizeOperationParams('brightnessContrast', params) ?? {
+    alpha: 1,
+    beta: 0
+  };
+  const adjustedMat = new cv.Mat();
+
+  try {
+    cv.convertScaleAbs(sourceMat, adjustedMat, normalizedParams.alpha, normalizedParams.beta);
+    return adjustedMat;
+  } catch (error) {
+    adjustedMat.delete();
+    throw error;
+  }
+}
+
+function applySharpen(cv, sourceMat, params = {}) {
+  const normalizedParams = normalizeOperationParams('sharpen', params) ?? {
+    intensity: 1
+  };
+  const intensity = normalizedParams.intensity;
   const sharpenedMat = new cv.Mat();
-  const kernel = cv.matFromArray(3, 3, cv.CV_32F, [0, -1, 0, -1, 5, -1, 0, -1, 0]);
+  const kernel = cv.matFromArray(3, 3, cv.CV_32F, [
+    0,
+    -intensity,
+    0,
+    -intensity,
+    1 + 4 * intensity,
+    -intensity,
+    0,
+    -intensity,
+    0
+  ]);
 
   try {
     cv.filter2D(sourceMat, sharpenedMat, -1, kernel);
@@ -468,42 +541,6 @@ function convertToGrayscale(cv, sourceMat) {
   }
 
   return grayMat;
-}
-
-function normalizeOddKernelSize(value, operationLabel) {
-  const kernelSize = Number(value);
-
-  if (!Number.isFinite(kernelSize) || kernelSize < 1) {
-    throw new Error(`${operationLabel} kernel size must be a positive odd number.`);
-  }
-
-  const roundedKernelSize = Math.round(kernelSize);
-
-  if (roundedKernelSize % 2 === 0) {
-    throw new Error(`${operationLabel} kernel size must be odd.`);
-  }
-
-  return roundedKernelSize;
-}
-
-function normalizeIterations(value, operationLabel) {
-  const iterations = Number(value);
-
-  if (!Number.isFinite(iterations) || iterations < 1) {
-    throw new Error(`${operationLabel} iterations must be a positive number.`);
-  }
-
-  return Math.round(iterations);
-}
-
-function clampByte(value) {
-  const numberValue = Number(value);
-
-  if (!Number.isFinite(numberValue)) {
-    throw new Error('Operation parameter must be a number between 0 and 255.');
-  }
-
-  return Math.min(255, Math.max(0, Math.round(numberValue)));
 }
 
 /**

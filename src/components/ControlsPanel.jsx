@@ -1,31 +1,10 @@
 import { useState } from 'react';
-
-const OPERATION_OPTIONS = [
-  { type: 'grayscale', label: 'Grayscale' },
-  { type: 'gaussianBlur', label: 'Gaussian Blur' },
-  { type: 'medianBlur', label: 'Median Blur' },
-  { type: 'threshold', label: 'Threshold' },
-  { type: 'binaryInverseThreshold', label: 'Binary Inverse Threshold' },
-  { type: 'canny', label: 'Canny Edge Detection' },
-  { type: 'erosion', label: 'Erosion' },
-  { type: 'dilation', label: 'Dilation' },
-  { type: 'opening', label: 'Opening' },
-  { type: 'closing', label: 'Closing' },
-  { type: 'histogramEqualisation', label: 'Histogram Equalisation' },
-  { type: 'sharpen', label: 'Sharpen preset' }
-];
-
-const DEFAULT_PARAMS = {
-  gaussianBlur: { kernelSize: 5 },
-  medianBlur: { kernelSize: 3 },
-  threshold: { thresholdValue: 127 },
-  binaryInverseThreshold: { thresholdValue: 127 },
-  canny: { threshold1: 100, threshold2: 200 },
-  erosion: { kernelSize: 3, iterations: 1 },
-  dilation: { kernelSize: 3, iterations: 1 },
-  opening: { kernelSize: 3, iterations: 1 },
-  closing: { kernelSize: 3, iterations: 1 }
-};
+import {
+  OPERATION_OPTIONS,
+  createOperationParamsMap,
+  formatOperationParams,
+  getOperationDefinition
+} from '../operationConfig.js';
 
 /**
  * Renders the pipeline controls and ordered operation list.
@@ -36,10 +15,16 @@ function ControlsPanel({
   pipeline,
   onSelectedOperationChange,
   onAppendOperation,
+  onUpdateStepParams,
+  onMoveStep,
+  onDuplicateStep,
+  onDeleteStep,
+  onExportPipeline,
+  onImportPipeline,
   onUndoLastStep,
   onResetPipeline
 }) {
-  const [operationParams, setOperationParams] = useState(DEFAULT_PARAMS);
+  const [operationParams, setOperationParams] = useState(createOperationParamsMap());
 
   const handleParamChange = (operationType, paramName, value) => {
     setOperationParams((currentParams) => ({
@@ -52,7 +37,21 @@ function ControlsPanel({
   };
 
   const handleAppendOperation = () => {
-    onAppendOperation(getParamsForOperation(selectedOperation, operationParams));
+    onAppendOperation(operationParams[selectedOperation] ?? {});
+  };
+
+  const handleImportChange = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => onImportPipeline(String(reader.result ?? ''));
+    reader.onerror = () => onImportPipeline('');
+    reader.readAsText(file);
   };
 
   return (
@@ -74,11 +73,14 @@ function ControlsPanel({
         ))}
       </select>
 
-      <OperationParams
-        selectedOperation={selectedOperation}
-        operationParams={operationParams}
+      <OperationFields
+        operationType={selectedOperation}
+        params={operationParams[selectedOperation] ?? {}}
         canEditPipeline={canEditPipeline}
-        onParamChange={handleParamChange}
+        onParamChange={(paramName, value) =>
+          handleParamChange(selectedOperation, paramName, value)
+        }
+        paramChangeContext="new-step"
       />
 
       <button
@@ -112,234 +114,147 @@ function ControlsPanel({
       <h2 className="panel-heading pipeline-heading">Pipeline</h2>
       {pipeline.length ? (
         <ol className="pipeline-list">
-          {pipeline.map((step) => (
-            <li key={step.id}>{formatPipelineStep(step)}</li>
+          {pipeline.map((step, index) => (
+            <li key={step.id} className="pipeline-step-item">
+              <div className="pipeline-step-header">
+                <span>{formatPipelineStep(step)}</span>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="action-button"
+                    onClick={() => onMoveStep(step.id, -1)}
+                    disabled={!canEditPipeline || index === 0}
+                  >
+                    Move Up
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button"
+                    onClick={() => onMoveStep(step.id, 1)}
+                    disabled={!canEditPipeline || index === pipeline.length - 1}
+                  >
+                    Move Down
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button"
+                    onClick={() => onDuplicateStep(step.id)}
+                    disabled={!canEditPipeline}
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    type="button"
+                    className="action-button"
+                    onClick={() => onDeleteStep(step.id)}
+                    disabled={!canEditPipeline}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              <OperationFields
+                operationType={step.type}
+                params={step.params}
+                canEditPipeline={canEditPipeline}
+                onParamChange={(paramName, value) =>
+                  onUpdateStepParams(step.id, {
+                    ...step.params,
+                    [paramName]: value
+                  })
+                }
+                paramChangeContext="pipeline-step"
+              />
+            </li>
           ))}
         </ol>
       ) : (
         <p className="empty-pipeline">No operations yet.</p>
       )}
+
+      <section className="sidebar-utility-section" aria-label="Pipeline JSON utilities">
+        <div className="button-row sidebar-utility-row">
+          <button type="button" className="action-button" onClick={onExportPipeline}>
+            Export JSON
+          </button>
+          <label className="action-button">
+            Import JSON
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImportChange}
+              style={{ display: 'none' }}
+            />
+          </label>
+        </div>
+      </section>
     </div>
   );
 }
 
-function OperationParams({
-  selectedOperation,
-  operationParams,
+function OperationFields({
+  operationType,
+  params,
   canEditPipeline,
-  onParamChange
+  onParamChange,
+  paramChangeContext
 }) {
-  if (selectedOperation === 'gaussianBlur') {
-    return (
-      <label className="param-label" htmlFor="gaussian-kernel-size">
-        Kernel Size
-        <select
-          id="gaussian-kernel-size"
-          className="param-input"
-          value={operationParams.gaussianBlur.kernelSize}
-          onChange={(event) =>
-            onParamChange('gaussianBlur', 'kernelSize', event.target.value)
-          }
-          disabled={!canEditPipeline}
-        >
-          {[3, 5, 7].map((kernelSize) => (
-            <option key={kernelSize} value={kernelSize}>
-              {kernelSize}
-            </option>
-          ))}
-        </select>
-      </label>
-    );
+  const definition = getOperationDefinition(operationType);
+
+  if (!definition || !definition.fields.length) {
+    return null;
   }
 
-  if (selectedOperation === 'medianBlur') {
-    return (
-      <label className="param-label" htmlFor="median-kernel-size">
-        Kernel Size
-        <select
-          id="median-kernel-size"
-          className="param-input"
-          value={operationParams.medianBlur.kernelSize}
-          onChange={(event) =>
-            onParamChange('medianBlur', 'kernelSize', event.target.value)
-          }
-          disabled={!canEditPipeline}
-        >
-          {[3, 5, 7].map((kernelSize) => (
-            <option key={kernelSize} value={kernelSize}>
-              {kernelSize}
-            </option>
-          ))}
-        </select>
-      </label>
-    );
-  }
+  return (
+    <div className="param-group">
+      {definition.fields.map((field) => {
+        const inputId = `${paramChangeContext}-${operationType}-${field.name}`;
+        const inputValue = params[field.name] ?? '';
 
-  if (
-    selectedOperation === 'threshold' ||
-    selectedOperation === 'binaryInverseThreshold'
-  ) {
-    const inputId = `${selectedOperation}-threshold-value`;
-
-    return (
-      <label className="param-label" htmlFor={inputId}>
-        Threshold Value
-        <input
-          id={inputId}
-          className="param-input"
-          type="number"
-          min="0"
-          max="255"
-          value={operationParams[selectedOperation].thresholdValue}
-          onChange={(event) =>
-            onParamChange(selectedOperation, 'thresholdValue', event.target.value)
-          }
-          disabled={!canEditPipeline}
-        />
-      </label>
-    );
-  }
-
-  if (selectedOperation === 'canny') {
-    return (
-      <div className="param-group">
-        <label className="param-label" htmlFor="canny-threshold-1">
-          Threshold 1
-          <input
-            id="canny-threshold-1"
-            className="param-input"
-            type="number"
-            min="0"
-            max="255"
-            value={operationParams.canny.threshold1}
-            onChange={(event) =>
-              onParamChange('canny', 'threshold1', event.target.value)
-            }
-            disabled={!canEditPipeline}
-          />
-        </label>
-        <label className="param-label" htmlFor="canny-threshold-2">
-          Threshold 2
-          <input
-            id="canny-threshold-2"
-            className="param-input"
-            type="number"
-            min="0"
-            max="255"
-            value={operationParams.canny.threshold2}
-            onChange={(event) =>
-              onParamChange('canny', 'threshold2', event.target.value)
-            }
-            disabled={!canEditPipeline}
-          />
-        </label>
-      </div>
-    );
-  }
-
-  if (
-    selectedOperation === 'erosion' ||
-    selectedOperation === 'dilation' ||
-    selectedOperation === 'opening' ||
-    selectedOperation === 'closing'
-  ) {
-    const operationLabel =
-      selectedOperation === 'erosion'
-        ? 'Erosion'
-        : selectedOperation === 'dilation'
-          ? 'Dilation'
-          : selectedOperation === 'opening'
-            ? 'Opening'
-            : 'Closing';
-
-    return (
-      <div className="param-group">
-        <label className="param-label" htmlFor={`${selectedOperation}-kernel-size`}>
-          Kernel Size
-          <select
-            id={`${selectedOperation}-kernel-size`}
-            className="param-input"
-            value={operationParams[selectedOperation].kernelSize}
-            onChange={(event) =>
-              onParamChange(selectedOperation, 'kernelSize', event.target.value)
-            }
-            disabled={!canEditPipeline}
-          >
-            {[3, 5, 7].map((kernelSize) => (
-              <option key={kernelSize} value={kernelSize}>
-                {kernelSize}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="param-label" htmlFor={`${selectedOperation}-iterations`}>
-          {operationLabel} Iterations
-          <select
-            id={`${selectedOperation}-iterations`}
-            className="param-input"
-            value={operationParams[selectedOperation].iterations}
-            onChange={(event) =>
-              onParamChange(selectedOperation, 'iterations', event.target.value)
-            }
-            disabled={!canEditPipeline}
-          >
-            {[1, 2, 3].map((iterations) => (
-              <option key={iterations} value={iterations}>
-                {iterations}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-    );
-  }
-
-  return null;
+        return (
+          <label key={field.name} className="param-label" htmlFor={inputId}>
+            {field.label}
+            {field.kind === 'select' ? (
+              <select
+                id={inputId}
+                className="param-input"
+                value={inputValue}
+                onChange={(event) => onParamChange(field.name, event.target.value)}
+                disabled={!canEditPipeline}
+              >
+                {field.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id={inputId}
+                className="param-input"
+                type="number"
+                min={field.min}
+                max={field.max}
+                step={field.kind === 'float' ? field.step ?? 0.1 : field.step ?? 1}
+                value={inputValue}
+                onChange={(event) => onParamChange(field.name, event.target.value)}
+                disabled={!canEditPipeline}
+              />
+            )}
+          </label>
+        );
+      })}
+    </div>
+  );
 }
 
 function formatPipelineStep(step) {
   const operation = OPERATION_OPTIONS.find((option) => option.type === step.type);
   const label = operation?.label ?? step.type;
-  const paramText = formatParams(step.type, step.params);
+  const paramText = formatOperationParams(step.type, step.params);
 
   return paramText ? `${label} (${paramText})` : label;
-}
-
-function formatParams(operationType, params = {}) {
-  if (operationType === 'gaussianBlur') {
-    return `kernel ${params.kernelSize}`;
-  }
-
-  if (operationType === 'medianBlur') {
-    return `kernel ${params.kernelSize}`;
-  }
-
-  if (operationType === 'threshold' || operationType === 'binaryInverseThreshold') {
-    return `threshold ${params.thresholdValue}`;
-  }
-
-  if (operationType === 'canny') {
-    return `${params.threshold1}, ${params.threshold2}`;
-  }
-
-  if (
-    operationType === 'erosion' ||
-    operationType === 'dilation' ||
-    operationType === 'opening' ||
-    operationType === 'closing'
-  ) {
-    return `kernel ${params.kernelSize}, iterations ${params.iterations}`;
-  }
-
-  if (operationType === 'histogramEqualisation') {
-    return '';
-  }
-
-  return '';
-}
-
-function getParamsForOperation(operationType, operationParams) {
-  return { ...(operationParams[operationType] ?? {}) };
 }
 
 export default ControlsPanel;
