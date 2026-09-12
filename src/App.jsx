@@ -16,6 +16,7 @@ import {
   parseImportedPipelinePayload,
   serializePipelineForExport
 } from './operationConfig.js';
+import { PRESETS } from './presets.js';
 import './App.css';
 
 const OPEN_CV_STATUS = {
@@ -262,6 +263,16 @@ function App() {
     setInspectStepIndex(null);
   };
 
+  const handleLoadPreset = (preset) => {
+    const nextPipeline = preset.steps.map((step) => ({
+      id: createPipelineStepId(),
+      type: step.type,
+      params: normalizeOperationParams(step.type, step.params) ?? {}
+    }));
+    setPipeline(nextPipeline);
+    setInspectStepIndex(null);
+  };
+
   const canEditPipeline = openCvStatus === 'ready';
 
   const formatBytes = (bytes, decimals = 2) => {
@@ -350,6 +361,7 @@ function App() {
           hasImage={hasImage}
           fileName={imageFile?.name}
           fileSize={imageFile ? formatBytes(imageFile.size) : null}
+          onLoadPreset={handleLoadPreset}
         />
 
         {/* Center Canvas - View */}

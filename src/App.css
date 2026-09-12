@@ -729,3 +729,150 @@
 
 /* Utility */
 .hidden { display: none !important; }
+
+/* ── Before/After Slider ── */
+.before-after-container {
+  position: relative;
+  display: inline-flex;   /* shrinks to the canvas natural size */
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  user-select: none;
+  cursor: col-resize;
+}
+
+/* Both layers share the same intrinsic dimensions */
+.before-after-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Processed sits as the base layer */
+.before-after-container > .before-after-canvas {
+  position: relative;
+  z-index: 1;
+}
+
+/* Original layer is absolutely positioned and clipped */
+.before-after-clip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+  z-index: 2;
+  /* clip-path instead of overflow:hidden so the canvas keeps its natural size */
+}
+
+.before-after-clip .before-after-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: auto;
+  height: 100%;
+}
+
+/* Divider line */
+.before-after-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent-primary);
+  transform: translateX(-50%);
+  z-index: 10;
+  cursor: col-resize;
+}
+
+/* Circular drag handle */
+.before-after-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #fff;
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.before-after-divider:hover .before-after-handle,
+.before-after-divider:active .before-after-handle {
+  transform: translate(-50%, -50%) scale(1.12);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Labels */
+.before-after-label {
+  position: absolute;
+  bottom: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  background: var(--bg-canvas-overlay);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  z-index: 11;
+}
+
+.before-after-label-left  { left:  var(--space-3); }
+.before-after-label-right { right: var(--space-3); }
+
+/* ── Preset Pipelines ── */
+.preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.preset-btn {
+  background: var(--bg-panel-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preset-btn:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-muted);
+}
+
+.preset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.preset-btn-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preset-btn-desc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

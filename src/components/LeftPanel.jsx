@@ -4,6 +4,7 @@ import {
   createOperationParamsMap,
   formatOperationParams
 } from '../operationConfig.js';
+import { PRESETS } from '../presets.js';
 
 function LeftPanel({
   canEditPipeline,
@@ -23,7 +24,8 @@ function LeftPanel({
   onFileSelect,
   hasImage,
   fileName,
-  fileSize
+  fileSize,
+  onLoadPreset
 }) {
   const [operationParams] = useState(createOperationParamsMap());
 
@@ -86,6 +88,25 @@ function LeftPanel({
             className="hidden"
           />
         </label>
+      </div>
+
+      {/* Preset Pipelines */}
+      <div className="panel-section">
+        <h2 className="section-label">PRESETS</h2>
+        <div className="preset-grid">
+          {PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              className="preset-btn"
+              disabled={!canEditPipeline}
+              onClick={() => onLoadPreset(preset)}
+              title={preset.description}
+            >
+              <span className="preset-btn-label">{preset.label}</span>
+              <span className="preset-btn-desc">{preset.description}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Add Operation */}
