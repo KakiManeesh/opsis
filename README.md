@@ -20,7 +20,7 @@ Upload an image, stack operations, tune parameters with live sliders, and get a 
 
 Opsis lets you build an OpenCV image-processing pipeline visually. Each operation you add is rendered live on a canvas and simultaneously translated into a Python `cv2` script. Copy the script, run it locally — the output matches what you saw in the browser.
 
-> **Try it → [opsis-3sw.pages.dev](https://opsis-3sw.pages.dev/)**
+> **Try it → <a href="https://opsis-3sw.pages.dev/" target="_blank" rel="noopener noreferrer">opsis-3sw.pages.dev</a>**
 
 ---
 
