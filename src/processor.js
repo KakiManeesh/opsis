@@ -299,6 +299,10 @@ function applyPipelineStep(cv, sourceMat, step) {
       return applyHistogramEqualisation(cv, sourceMat);
     case 'rotateImage':
       return applyRotateImage(cv, sourceMat, step.params);
+    case 'bilateralFilter':
+      return applyBilateralFilter(cv, sourceMat, step.params);
+    case 'antiAliasBinary':
+      return applyAntiAliasBinary(cv, sourceMat, step.params);
     case 'brightnessContrast':
       return applyBrightnessContrast(cv, sourceMat, step.params);
     case 'sharpen':
@@ -486,6 +490,88 @@ function applyRotateImage(cv, sourceMat, params = {}) {
   } catch (error) {
     rotatedMat.delete();
     throw error;
+  }
+}
+
+function applyBilateralFilter(cv, sourceMat, params = {}) {
+  const normalizedParams = normalizeOperationParams('bilateralFilter', params) ?? {
+    diameter: 9,
+    sigmaColor: 75,
+    sigmaSpace: 75
+  };
+
+  if (sourceMat.channels() !== 4) {
+    const filteredMat = new cv.Mat();
+
+    try {
+      cv.bilateralFilter(
+        sourceMat,
+        filteredMat,
+        normalizedParams.diameter,
+        normalizedParams.sigmaColor,
+        normalizedParams.sigmaSpace
+      );
+      return filteredMat;
+    } catch (error) {
+      filteredMat.delete();
+      throw error;
+    }
+  }
+
+  const rgbMat = new cv.Mat();
+  const filteredRgbMat = new cv.Mat();
+  const outputMat = new cv.Mat();
+
+  try {
+    cv.cvtColor(sourceMat, rgbMat, cv.COLOR_RGBA2RGB);
+    cv.bilateralFilter(
+      rgbMat,
+      filteredRgbMat,
+      normalizedParams.diameter,
+      normalizedParams.sigmaColor,
+      normalizedParams.sigmaSpace
+    );
+    cv.cvtColor(filteredRgbMat, outputMat, cv.COLOR_RGB2RGBA);
+    return outputMat;
+  } catch (error) {
+    outputMat.delete();
+    throw error;
+  } finally {
+    rgbMat.delete();
+    filteredRgbMat.delete();
+  }
+}
+
+function applyAntiAliasBinary(cv, sourceMat, params = {}) {
+  const normalizedParams = normalizeOperationParams('antiAliasBinary', params) ?? {
+    blurKernel: 5,
+    thresholdValue: 127
+  };
+  const grayMat = convertToGrayscale(cv, sourceMat);
+  const blurredMat = new cv.Mat();
+  const thresholdMat = new cv.Mat();
+
+  try {
+    cv.GaussianBlur(
+      grayMat,
+      blurredMat,
+      new cv.Size(normalizedParams.blurKernel, normalizedParams.blurKernel),
+      0
+    );
+    cv.threshold(
+      blurredMat,
+      thresholdMat,
+      normalizedParams.thresholdValue,
+      255,
+      cv.THRESH_BINARY
+    );
+    return thresholdMat;
+  } catch (error) {
+    thresholdMat.delete();
+    throw error;
+  } finally {
+    grayMat.delete();
+    blurredMat.delete();
   }
 }
 

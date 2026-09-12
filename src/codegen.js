@@ -32,6 +32,26 @@ export function generatePythonCode(pipeline = []) {
   ].join('\n');
 }
 
+/**
+ * Returns the Python lines for a single step at the given index, correctly
+ * accounting for whether the image is grayscale at that point in the pipeline.
+ */
+export function generateStepSnippet(pipeline = [], stepIndex) {
+  if (stepIndex < 0 || stepIndex >= pipeline.length) {
+    return '# No step selected';
+  }
+
+  // Walk up to stepIndex to determine isGray state entering this step.
+  let isGray = false;
+  for (let i = 0; i < stepIndex; i++) {
+    const result = generateStepCode(pipeline[i], isGray);
+    isGray = result.isGray;
+  }
+
+  const { lines } = generateStepCode(pipeline[stepIndex], isGray);
+  return lines.join('\n') || '# No code for this step';
+}
+
 function generateStepCode(step, isGray) {
   switch (step.type) {
     case 'grayscale':
@@ -58,6 +78,10 @@ function generateStepCode(step, isGray) {
       return generateHistogramEqualisationCode(isGray);
     case 'rotateImage':
       return generateRotateImageCode(step.params, isGray);
+    case 'bilateralFilter':
+      return generateBilateralFilterCode(step.params, isGray);
+    case 'antiAliasBinary':
+      return generateAntiAliasBinaryCode(step.params, isGray);
     case 'brightnessContrast':
       return generateBrightnessContrastCode(step.params, isGray);
     case 'sharpen':
@@ -209,6 +233,36 @@ function generateRotateImageCode(params = {}, isGray) {
     lines: [`img = cv2.rotate(img, ${rotationConstant})`],
     isGray
   };
+}
+
+function generateBilateralFilterCode(params = {}, isGray) {
+  const normalizedParams = normalizeOperationParams('bilateralFilter', params) ?? {
+    diameter: 9,
+    sigmaColor: 75,
+    sigmaSpace: 75
+  };
+
+  return {
+    lines: [
+      `img = cv2.bilateralFilter(img, ${normalizedParams.diameter}, ${normalizedParams.sigmaColor}, ${normalizedParams.sigmaSpace})`
+    ],
+    isGray
+  };
+}
+
+function generateAntiAliasBinaryCode(params = {}, isGray) {
+  const normalizedParams = normalizeOperationParams('antiAliasBinary', params) ?? {
+    blurKernel: 5,
+    thresholdValue: 127
+  };
+  const lines = ensureGrayCode(isGray);
+
+  lines.push(
+    `img = cv2.GaussianBlur(img, (${normalizedParams.blurKernel}, ${normalizedParams.blurKernel}), 0)`,
+    `_, img = cv2.threshold(img, ${normalizedParams.thresholdValue}, 255, cv2.THRESH_BINARY)`
+  );
+
+  return { lines, isGray: true };
 }
 
 function generateBrightnessContrastCode(params = {}, isGray) {

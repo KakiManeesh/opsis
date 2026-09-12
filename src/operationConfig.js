@@ -20,6 +20,23 @@ const OPERATION_DEFINITIONS = {
       }
     ]
   },
+  bilateralFilter: {
+    label: 'Noise Reduction',
+    defaults: { diameter: 9, sigmaColor: 75, sigmaSpace: 75 },
+    fields: [
+      { name: 'diameter', label: 'Diameter', kind: 'int', min: 1, max: 25, step: 1 },
+      { name: 'sigmaColor', label: 'Sigma Color', kind: 'int', min: 10, max: 250, step: 1 },
+      { name: 'sigmaSpace', label: 'Sigma Space', kind: 'int', min: 10, max: 250, step: 1 }
+    ]
+  },
+  antiAliasBinary: {
+    label: 'Anti-Alias Binary Edge',
+    defaults: { blurKernel: 5, thresholdValue: 127 },
+    fields: [
+      { name: 'blurKernel', label: 'Blur Kernel', kind: 'kernelOdd', min: 3, max: 15, step: 1 },
+      { name: 'thresholdValue', label: 'Threshold Value', kind: 'int', min: 0, max: 255, step: 1 }
+    ]
+  },
   gaussianBlur: {
     label: 'Blur',
     defaults: { kernelSize: 5 },
@@ -109,6 +126,8 @@ const OPERATION_DEFINITIONS = {
 const OPERATION_ORDER = [
   'grayscale',
   'rotateImage',
+  'bilateralFilter',
+  'antiAliasBinary',
   'gaussianBlur',
   'medianBlur',
   'threshold',
@@ -162,6 +181,22 @@ export function normalizeOperationParams(type, rawParams = {}) {
     case 'rotateImage':
       return {
         rotationCode: normalizeInteger(params.rotationCode, 0, 2, getDefault(type, 'rotationCode'))
+      };
+    case 'bilateralFilter':
+      return {
+        diameter: normalizeInteger(params.diameter, 1, 25, getDefault(type, 'diameter')),
+        sigmaColor: normalizeInteger(params.sigmaColor, 10, 250, getDefault(type, 'sigmaColor')),
+        sigmaSpace: normalizeInteger(params.sigmaSpace, 10, 250, getDefault(type, 'sigmaSpace'))
+      };
+    case 'antiAliasBinary':
+      return {
+        blurKernel: normalizeOddKernelSize(params.blurKernel, getDefault(type, 'blurKernel')),
+        thresholdValue: normalizeInteger(
+          params.thresholdValue,
+          0,
+          255,
+          getDefault(type, 'thresholdValue')
+        )
       };
     case 'gaussianBlur':
     case 'medianBlur':
@@ -231,6 +266,10 @@ export function formatOperationParams(type, params = {}) {
         : normalizedParams.rotationCode === 1
           ? '180°'
           : '90° CCW';
+    case 'bilateralFilter':
+      return `d ${normalizedParams.diameter}, sigmaColor ${normalizedParams.sigmaColor}, sigmaSpace ${normalizedParams.sigmaSpace}`;
+    case 'antiAliasBinary':
+      return `blur ${normalizedParams.blurKernel}, threshold ${normalizedParams.thresholdValue}`;
     case 'threshold':
     case 'binaryInverseThreshold':
       return `threshold ${normalizedParams.thresholdValue}, max ${normalizedParams.maxValue}`;
