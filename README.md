@@ -6,11 +6,11 @@
 
 Upload an image, stack operations, tune parameters with live sliders, and get a copy-paste Python `cv2` script — all in the browser, no backend required.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-opsis--3sw.pages.dev-4f46e5?style=for-the-badge)](https://opsis-3sw.pages.dev/)
-[![GitHub](https://img.shields.io/badge/GitHub-KakiManeesh%2Fopsis-181717?style=for-the-badge&logo=github)](https://github.com/KakiManeesh/opsis)
-[![React](https://img.shields.io/badge/React-18-61dafb?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
-[![CI](https://github.com/KakiManeesh/opsis/actions/workflows/ci.yml/badge.svg)](https://github.com/KakiManeesh/opsis/actions/workflows/ci.yml)
+<a href="https://opsis-3sw.pages.dev/" target="_blank"><img src="https://img.shields.io/badge/Live%20Demo-opsis--3sw.pages.dev-4f46e5?style=for-the-badge" alt="Live Demo"></a>
+<a href="https://github.com/KakiManeesh/opsis" target="_blank"><img src="https://img.shields.io/badge/GitHub-KakiManeesh%2Fopsis-181717?style=for-the-badge&logo=github" alt="GitHub"></a>
+<a href="https://react.dev/" target="_blank"><img src="https://img.shields.io/badge/React-18-61dafb?style=for-the-badge&logo=react&logoColor=black" alt="React"></a>
+<a href="./LICENSE" target="_blank"><img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License: MIT"></a>
+<a href="https://github.com/KakiManeesh/opsis/actions/workflows/ci.yml" target="_blank"><img src="https://github.com/KakiManeesh/opsis/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 
 </div>
 
