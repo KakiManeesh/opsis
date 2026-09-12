@@ -1,53 +1,84 @@
-# Visual Image Processing Pipeline App
+# Opsis — Visual Image Processing Pipeline
 
-A browser-based tool for building image-processing pipelines without writing any code. Upload a photo, chain together operations like blur, edge detection, or thresholding, watch the result update in real time, and read the equivalent Python OpenCV code that was generated automatically from your pipeline.
+A browser-based, no-code image processing pipeline builder. Upload an image, chain together OpenCV operations through a visual GUI, watch the result update live, and get a runnable Python `cv2` script generated automatically — no server, no backend, everything runs in the browser.
 
 ---
 
 ## Key Features
 
-- **No-code pipeline builder** — select an operation, configure its parameters, and add it to a live, ordered pipeline
-- **Side-by-side preview** — original and processed images are rendered on separate HTML5 canvases
-- **Real-time processing** — the output canvas updates immediately after every pipeline change
-- **Python code generation** — a `Generated Python Code` panel shows runnable `cv2` code that mirrors exactly what the browser is doing
-- **Undo and reset** — remove the last step or clear the entire pipeline in one click
-- **Runs entirely in the browser** — OpenCV.js is loaded from a CDN at runtime; no server, no backend
+- **No-code pipeline builder** — select from 16 operations, configure parameters with sliders and dropdowns, and stack them into a live pipeline
+- **Real-time preview** — the output canvas updates immediately after every change
+- **Three view modes** — toggle between Final Result, Original, or Side-by-Side split view
+- **Per-step inspection** — click any pipeline step to preview the intermediate result up to that point
+- **Python code generation** — a collapsible footer panel shows a complete, runnable `cv2` script that mirrors exactly what the browser computed
+- **Per-step code snippets** — the right inspector also shows the Python snippet for the selected step specifically
+- **Step management** — reorder, duplicate, or delete any step in the pipeline
+- **Undo & Reset** — remove the last step or clear the entire pipeline
+- **Pipeline import / export** — save and load pipelines as JSON files
+- **Drag-and-drop upload** — drop an image directly onto the canvas
+- **Runs entirely in the browser** — OpenCV.js is loaded from a CDN; no server required
 
 ---
 
-## Supported Operations
+## Supported Operations (16)
 
 | Operation | Configurable Parameters |
 |---|---|
 | Grayscale | None |
-| Gaussian Blur | Kernel size (3, 5, or 7) |
-| Threshold | Threshold value (0–255) |
-| Binary Inverse Threshold | Threshold value (0–255) |
-| Canny Edge Detection | Threshold 1 and Threshold 2 (0–255 each) |
-| Sharpen | None (fixed 3×3 kernel preset) |
+| Rotate Image | Rotation code (90° CW / 180° / 90° CCW) |
+| Gaussian Blur | Kernel size (odd, 1–31) |
+| Median Blur | Kernel size (odd, 1–31) |
+| Bilateral Filter (Noise Reduction) | Diameter, sigma color, sigma space |
+| Anti-Alias Binary Edge | Blur kernel, threshold value |
+| Threshold | Threshold value, max value |
+| Binary Inverse Threshold | Threshold value, max value |
+| Canny Edge Detection | Low threshold, high threshold |
+| Sharpen | Intensity (0.5–3.0) |
+| Brightness / Contrast | Alpha (contrast), beta (brightness) |
+| Erosion | Kernel size, iterations |
+| Dilation | Kernel size, iterations |
+| Opening | Kernel size, iterations |
+| Closing | Kernel size, iterations |
+| Histogram Equalization | None |
 
-Operations can be stacked in any order and the same operation can appear more than once in a pipeline.
+Operations can be stacked in any order and the same operation can appear multiple times.
 
 ---
 
 ## How It Works
 
-The app is organised around three concerns that are kept deliberately separate:
+The app is organised around three concerns kept deliberately separate:
 
-**`processor.js`** — owns all OpenCV.js interactions. It handles loading the library from the CDN (with timeout and multiple readiness-detection strategies to cope with OpenCV's Emscripten quirks), draws the uploaded file onto the original canvas, and runs the pipeline step by step using OpenCV `Mat` objects. Every `Mat` is deleted after use to avoid memory leaks.
+**`processor.js`** — the only file that touches OpenCV.js. Handles loading the WASM module from the CDN (with three fallback strategies for the Emscripten initialization quirks and a 30-second timeout), then executes the pipeline by reading pixels into `cv.Mat` objects, running each step, and writing the result back to a canvas. Every `Mat` is deleted in `finally` blocks to prevent memory leaks.
 
-**`codegen.js`** — a pure function (`generatePythonCode`) that maps the same pipeline array to Python source code. It tracks grayscale state across steps so it only emits `cv2.cvtColor` conversions when actually needed, and only imports `numpy` when the sharpen operation is present.
+**`codegen.js`** — a pure function (`generatePythonCode`) that takes the pipeline array and returns a Python string. It tracks grayscale state across steps to avoid emitting redundant `cvtColor` calls, adds `import numpy as np` only when an operation needs it, and exposes `generateStepSnippet` for per-step code in the inspector.
 
-**`App.jsx`** — coordinates state and side effects. It stores the pipeline as an array of `{ id, type, params }` objects. A single `useEffect` that depends on `[hasImage, openCvStatus, pipeline]` re-runs the processor and code generator whenever any of those change.
+**`operationConfig.js`** — the single source of truth for all 16 operations: labels, default parameters, field definitions (sliders, selects, odd-kernel inputs), normalization/clamping logic, and display formatting. Both `processor.js` and `codegen.js` call `normalizeOperationParams` from here, ensuring the Python code always matches what OpenCV computed. Also provides `serializePipelineForExport` and `parseImportedPipelinePayload` for JSON pipeline I/O.
 
-**Components:**
+**`App.jsx`** — state hub. Stores the pipeline as an array of `{ id, type, params }` objects and coordinates rendering via a `useEffect` that re-runs whenever the active pipeline, image, or OpenCV status changes. The "active pipeline" is either the full pipeline or a slice up to the inspected step, enabling the intermediate preview mode.
 
-| File | Responsibility |
+---
+
+## UI Layout
+
+```
+┌──────────────────────────────────────────────────────┐
+│  HEADER — title, OpenCV status badge, image filename │
+├──────────┬─────────────────────────┬─────────────────┤
+│  LEFT    │    CENTER CANVAS        │  RIGHT          │
+│  PANEL   │    (flexible width)     │  INSPECTOR      │
+│  (280px) │                         │  (320px)        │
+├──────────┴─────────────────────────┴─────────────────┤
+│  FOOTER — collapsible generated Python code panel    │
+└──────────────────────────────────────────────────────┘
+```
+
+| Panel | Contents |
 |---|---|
-| `ImageUploader.jsx` | File input; forwards the `File` object to `App` |
-| `ControlsPanel.jsx` | Operation selector, per-operation parameter controls, pipeline list, undo/reset buttons |
-| `ImagePreview.jsx` | Thin wrapper that attaches a React ref to an HTML canvas |
-| `CodePanel.jsx` | Renders the generated Python string inside a `<pre>` block |
+| Left | Image upload, operation dropdown, Add Step button, pipeline step cards (reorder / duplicate / delete), Undo / Reset, JSON export / import |
+| Center | Live canvas with view-mode toggle (Final / Original / Split); drag-and-drop target |
+| Right Inspector | Parameter controls for the selected step (sliders, dropdowns), per-step Python snippet |
+| Footer | Full generated Python script, collapsible |
 
 ---
 
@@ -55,9 +86,11 @@ The app is organised around three concerns that are kept deliberately separate:
 
 - **React 18** — UI and state
 - **Vite 5** — dev server and build tooling
-- **OpenCV.js 4.x** — image processing (loaded from `docs.opencv.org` CDN)
-- **Vanilla CSS** — layout and styling (no framework)
+- **OpenCV.js 4.x** — image processing (loaded from `docs.opencv.org` CDN at runtime)
+- **Vanilla CSS** with CSS custom properties — layout and styling (no framework)
 - **JavaScript (ES Modules)** — no TypeScript
+
+Production dependencies: `react` and `react-dom` only.
 
 ---
 
@@ -67,8 +100,8 @@ The app is organised around three concerns that are kept deliberately separate:
 
 ```bash
 # 1. Clone the repository
-git clone <your-repo-url>
-cd <repo-directory>
+git clone https://github.com/KakiManeesh/opsis.git
+cd opsis
 
 # 2. Install dependencies
 npm install
@@ -79,48 +112,52 @@ npm run dev
 
 Open the URL printed by Vite (usually `http://localhost:5173`).
 
-> **Note:** The app fetches OpenCV.js (~9 MB) from the OpenCV CDN on first load. The header badge will read **Loading…** until the library is ready, at which point it switches to **OpenCV Ready** and the pipeline controls become active. An internet connection is required.
+> **Note:** The app fetches OpenCV.js (~9 MB) from the OpenCV CDN on first load. The header badge shows **Loading…** until the library is ready, then switches to **OpenCV Ready** and enables all pipeline controls. An internet connection is required.
 
-### Other scripts
+### Available Scripts
 
 | Command | What it does |
 |---|---|
 | `npm run dev` | Start Vite dev server with hot module replacement |
 | `npm run build` | Build the production bundle into `dist/` |
-| `npm run preview` | Serve the production build locally for a quick check |
+| `npm run preview` | Serve the production build locally |
 
 ---
 
 ## Project Structure
 
 ```
-project-root/
-├── index.html              # App shell; sets the page title
-├── vite.config.js          # Vite config (React plugin only)
+opsis/
+├── index.html                  # App shell
+├── vite.config.js              # Vite config (React plugin)
 ├── package.json
 └── src/
-    ├── main.jsx            # React root mount point
-    ├── App.jsx             # Top-level state, effects, layout
-    ├── App.css             # All styles; responsive grid breakpoint at 900px
-    ├── processor.js        # OpenCV.js loading and pipeline execution
-    ├── codegen.js          # Python code generation from pipeline array
+    ├── main.jsx                # React root mount
+    ├── App.jsx                 # Top-level state, effects, layout
+    ├── App.css                 # Global styles
+    ├── processor.js            # OpenCV.js loading + pipeline execution
+    ├── codegen.js              # Python code generation
+    ├── operationConfig.js      # Operation metadata, params, normalization
     └── components/
+        ├── LeftPanel.jsx       # Pipeline builder sidebar
+        ├── CenterCanvas.jsx    # Live canvas with view-mode toggle
+        ├── RightInspector.jsx  # Per-step param controls + code snippet
+        ├── FooterCode.jsx      # Collapsible Python code panel
         ├── ImageUploader.jsx   # File input component
-        ├── ControlsPanel.jsx   # Pipeline builder UI and operation params
-        ├── ImagePreview.jsx    # Canvas wrapper for image display
-        └── CodePanel.jsx       # Generated code display
+        ├── ImagePreview.jsx    # Canvas wrapper
+        └── CodePanel.jsx       # Code display block
 ```
 
 ---
 
 ## Example User Flow
 
-1. Open the app in a browser — wait for the **OpenCV Ready** badge.
-2. Click **Upload Image** and choose a JPEG, PNG, or any browser-supported format.
-3. The original image appears in the left canvas. The right canvas shows the same image (no operations yet).
-4. In the sidebar, select **Gaussian Blur**, set the kernel size to `5`, and click **Add to Pipeline**. The processed canvas updates immediately.
-5. Select **Canny Edge Detection**, set Threshold 1 to `100` and Threshold 2 to `200`, and add it. The canvases update again.
-6. Scroll down to the **Generated Python Code** panel. You will see:
+1. Open the app — wait for the **OpenCV Ready** badge in the header.
+2. Click **Upload Image** (or drag a file onto the canvas) and choose any browser-supported image.
+3. Select **Gaussian Blur**, set the kernel to `5`, and click **Add Step**. The canvas updates instantly.
+4. Select **Canny Edge Detection**, set Low to `100` and High to `200`, and add it.
+5. Click the Canny step card in the left panel — the right inspector shows its parameters and the partial Python snippet. The canvas shows the result only up to that step.
+6. Open the footer to see the full generated Python script:
    ```python
    import cv2
 
@@ -132,48 +169,20 @@ project-root/
    cv2.imshow("output", img)
    cv2.waitKey(0)
    ```
-7. Copy the code, paste it into a local Python script, and run it — it will produce the same result.
-8. Use **Undo Last Step** to remove Canny, or **Reset Pipeline** to start over.
-
----
-
-## Current Limitations
-
-- **No export** — there is no button to save the processed image or copy the generated code to the clipboard.
-- **OpenCV.js bundle size** — the library is ~9 MB and must be downloaded fresh on each visit (not cached locally by the app).
-- **Linear pipeline only** — operations are applied sequentially; branching or parallel paths are not supported.
-- **Single image** — only one image can be loaded at a time.
-- **No parameter editing after adding** — once a step is in the pipeline it cannot be changed in place; you must undo to the step and re-add it.
-- **Sharpen has no parameters** — the kernel (`[0, -1, 0, -1, 5, -1, 0, -1, 0]`) is hardcoded.
-
----
-
-## Roadmap
-
-These are ideas for future work, not yet implemented:
-
-- [ ] Download processed image as PNG
-- [ ] Copy generated Python code to clipboard
-- [ ] Edit parameters of an existing pipeline step in place
-- [ ] Drag-and-drop to reorder pipeline steps
-- [ ] Additional operations: Dilation, Erosion, Median Blur, Histogram Equalisation
-- [ ] Configurable sharpen strength
-- [ ] Persist pipeline to `localStorage` so it survives a page refresh
-- [ ] Dark mode
-- [ ] Generate code for additional languages (e.g., JavaScript with OpenCV.js)
+7. Use the export button to save the pipeline as JSON and reload it later.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. To get started:
+Contributions are welcome.
 
 1. Fork the repository and create a feature branch.
-2. Run `npm run dev` and verify your changes work locally.
+2. Run `npm run dev` and verify your changes locally.
 3. Keep changes focused — one feature or fix per pull request.
 4. Follow the existing code style: JSDoc comments on exported functions, explicit parameter defaults, and `Mat` cleanup in `finally` blocks.
 
-Please open an issue before starting significant work so the approach can be discussed first.
+Open an issue before starting significant work so the approach can be discussed first.
 
 ---
 
