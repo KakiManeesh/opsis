@@ -197,19 +197,20 @@ function App() {
   };
 
   const handleDeleteStep = (stepId) => {
+    // Both state updates must derive the deleted index from the same
+    // currentPipeline snapshot. Reading `pipeline` from the outer closure
+    // inside setInspectStepIndex would risk using a stale value, so we
+    // compute the index once inside setPipeline and pass it via a ref.
+    let deletedIndex = -1;
     setPipeline((currentPipeline) => {
-      const index = currentPipeline.findIndex(s => s.id === stepId);
-      if (index === -1) return currentPipeline;
+      deletedIndex = currentPipeline.findIndex((s) => s.id === stepId);
+      if (deletedIndex === -1) return currentPipeline;
       return currentPipeline.filter((step) => step.id !== stepId);
     });
-    // Use the functional form of setInspectStepIndex so we always read
-    // the latest value, not the stale closure.
     setInspectStepIndex((currentIndex) => {
-      if (currentIndex === null) return null;
-      const index = pipeline.findIndex(s => s.id === stepId);
-      if (index === -1) return currentIndex;
-      if (currentIndex === index) return null;
-      if (currentIndex > index) return currentIndex - 1;
+      if (currentIndex === null || deletedIndex === -1) return currentIndex;
+      if (currentIndex === deletedIndex) return null;
+      if (currentIndex > deletedIndex) return currentIndex - 1;
       return currentIndex;
     });
   };
