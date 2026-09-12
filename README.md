@@ -10,6 +10,7 @@ Upload an image, stack operations, tune parameters with live sliders, and get a 
 [![GitHub](https://img.shields.io/badge/GitHub-KakiManeesh%2Fopsis-181717?style=for-the-badge&logo=github)](https://github.com/KakiManeesh/opsis)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](./LICENSE)
+[![CI](https://github.com/KakiManeesh/opsis/actions/workflows/ci.yml/badge.svg)](https://github.com/KakiManeesh/opsis/actions/workflows/ci.yml)
 
 </div>
 
@@ -163,7 +164,9 @@ opsis/
 └── src/tests/
     ├── operationConfig.test.js # Param normalisation tests
     ├── codegen.test.js         # Code generation tests
-    └── pipeline.test.js        # Import/export validation tests
+    ├── codegen.edge.test.js    # Grayscale-position and edge-case code generation
+    ├── pipeline.test.js        # Import/export validation tests
+    └── processor.test.js       # Pipeline execution and Mat cleanup (cv mock)
 ```
 
 ---
@@ -173,7 +176,7 @@ opsis/
 1. Fork and create a feature branch
 2. `npm run dev` to verify locally, `npm test` to run the test suite
 3. One feature or fix per PR — open an issue first for significant changes
-4. Follow the existing style: JSDoc on exported functions, `Mat` cleanup in `finally` blocks
+4. CI runs automatically on every push and pull request (`npm ci`, `npm test`, `npm run build`)
 
 ---
 
